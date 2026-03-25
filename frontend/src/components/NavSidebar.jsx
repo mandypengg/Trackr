@@ -25,7 +25,13 @@ export default function NavSidebar({ isOpen, onClose }) {
 
       {/* Nav Links */}
       <div style={styles.navLinks}>
-        <button style={{...styles.navItem, ...styles.navItemActive}}>
+        <button 
+          style={{
+            ...styles.navItem, 
+            ...(window.location.pathname === '/dashboard' ? styles.navItemActive : {})
+          }}
+          onClick={() => navigate('/dashboard')}
+        >
           Job Tracker
         </button>
         <button 
@@ -46,9 +52,13 @@ export default function NavSidebar({ isOpen, onClose }) {
       {/* Footer / Account */}
       <div style={styles.footer}>
         <div 
-          style={styles.accountItem}
-          onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
-          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          style={{
+            ...styles.accountItem,
+            ...(window.location.pathname === '/account' ? styles.accountItemActive : {})
+          }}
+          onClick={() => navigate('/account')}
+          onMouseEnter={e => window.location.pathname !== '/account' && (e.currentTarget.style.opacity = '0.7')}
+          onMouseLeave={e => window.location.pathname !== '/account' && (e.currentTarget.style.opacity = '1')}
         >
           <div style={styles.avatar}></div>
           <span style={styles.accountText}>Account</span>
@@ -138,7 +148,15 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     cursor: "pointer",
-    transition: "opacity 0.2s ease",
+    transition: "all 0.2s ease",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    marginLeft: "-12px", // offset padding to align with text above
+  },
+  accountItemActive: {
+    background: "rgba(108, 155, 219, 0.1)",
+    borderRight: "3px solid #6C9BDB",
+    opacity: 1,
   },
   avatar: {
     width: "24px",

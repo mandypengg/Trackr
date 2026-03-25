@@ -3,6 +3,7 @@ import { AuthProvider } from "./AuthContext"
 import LandingPage from "./LandingPage"
 import LoginPage from "./LoginPage"
 import SignupPage from "./SignupPage"
+import AccountPage from "./AccountPage"
 import Dashboard from "./Dashboard"
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/account" element={<AccountPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

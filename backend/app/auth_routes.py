@@ -36,3 +36,41 @@ def login(user_data: schemas.UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=schemas.UserResponse)
 def get_me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+@router.put("/me", response_model=schemas.UserResponse)
+def update_me(
+    user_update: schemas.UserUpdate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    if user_update.name is not None:
+        current_user.name = user_update.name
+    if user_update.email is not None:
+        # Check if email is already taken by another user
+        existing = db.query(models.User).filter(models.User.email == user_update.email, models.User.id != current_user.id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already in use")
+        current_user.email = user_update.email
+    
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+@router.put("/password")
+def update_password(
+    pass_update: schemas.PasswordUpdate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    current_user.hashed_password = hash_password(pass_update.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+@router.delete("/me")
+def delete_me(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Explicitly delete all applications belonging to this user
+    db.query(models.Application).filter(models.Application.user_id == current_user.id).delete()
+    # Delete the user themself
+    db.delete(current_user)
+    db.commit()
+    return {"message": "Account and all associated data deleted successfully"}
