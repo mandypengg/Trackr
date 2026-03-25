@@ -9,6 +9,43 @@ import UploadModal from "./components/UploadModal"
 import AddJobModal from "./components/AddJobModal"
 import { ChevronDown } from "lucide-react"
 
+const EditableCell = ({ value, type = "text", onSave }) => {
+  const [isEditing, setIsEditing] = useState(false)
+  const [val, setVal] = useState(value || "")
+
+  useEffect(() => setVal(value || ""), [value])
+
+  const handleBlur = () => {
+    setIsEditing(false)
+    if (val !== (value || "")) {
+      onSave(val)
+    }
+  }
+
+  if (isEditing) {
+    return (
+      <input 
+        autoFocus
+        type={type}
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={e => e.key === 'Enter' && handleBlur()}
+        style={styles.inlineInput}
+      />
+    )
+  }
+
+  return (
+    <div 
+      onClick={() => setIsEditing(true)} 
+      style={styles.editableText}
+    >
+      {value || <span style={{color: '#555'}}>-</span>}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const { token } = useAuth()
@@ -22,6 +59,19 @@ export default function Dashboard() {
   const [isAddJobOpen, setIsAddJobOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [sortConfig, setSortConfig] = useState(null)
+  const [selectedJobs, setSelectedJobs] = useState([])
+
+  const ALL_COLUMNS = [
+    { label: "Job Position", key: "role" },
+    { label: "Company", key: "company" },
+    { label: "Location", key: "location" },
+    { label: "Date Posted", key: "date_posted" },
+    { label: "Date Applied", key: "date_applied" },
+    { label: "Salary", key: "salary" },
+    { label: "Status", key: "status" },
+    { label: "Notes", key: "notes" },
+  ]
+  const [visibleColumns, setVisibleColumns] = useState(ALL_COLUMNS.map(c => c.key))
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -75,20 +125,19 @@ export default function Dashboard() {
     setFilteredApps(filtered)
   }, [searchQuery, applications])
 
-  const handleStatusChange = async (appId, newStatus) => {
+  const handleInlineEdit = async (appId, field, newValue) => {
     try {
-      // Optimistic upate
-      const updateLocal = prev => prev.map(a => a.id === appId ? { ...a, status: newStatus } : a)
+      const updateLocal = prev => prev.map(a => a.id === appId ? { ...a, [field]: newValue } : a)
       setApplications(updateLocal)
       setFilteredApps(updateLocal)
       
       await apiFetch(`/applications/${appId}`, {
         method: "PUT",
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ [field]: newValue })
       })
     } catch (err) {
-      console.error("Failed to update status", err)
-      refreshApplications() // Revert on err
+      console.error(`Failed to update ${field}`, err)
+      refreshApplications()
     }
   }
 
@@ -126,6 +175,14 @@ export default function Dashboard() {
     displayApps.push({ _empty: true, id: `empty-${displayApps.length}` })
   }
 
+  const handleSelectJob = (id) => {
+    setSelectedJobs(prev => 
+      prev.includes(id) ? prev.filter(jobId => jobId !== id) : [...prev, id]
+    )
+  }
+
+  const allJobIds = sortedApps.filter(a => !a._empty).map(a => a.id)
+
   const SortIcon = ({ col }) => {
     if (!sortConfig || sortConfig.key !== col) return null
     return <span style={{ marginLeft: '4px', fontSize: '12px' }}>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
@@ -138,13 +195,22 @@ export default function Dashboard() {
       {/* Main Content Area (offset by sidebar width) */}
       <div style={{ ...styles.mainContent, marginLeft: isSidebarOpen ? "240px" : "0" }}>
         <div style={styles.topSection}>
-          <MetricsBar applications={applications} />
+          <MetricsBar 
+            applications={applications} 
+            isSidebarOpen={isSidebarOpen} 
+            onOpenSidebar={() => setIsSidebarOpen(true)} 
+          />
           <ActionBar 
             onSearch={setSearchQuery} 
             onUploadClick={() => setIsUploadOpen(true)}
             onAddJobClick={() => setIsAddJobOpen(true)}
-            isSidebarOpen={isSidebarOpen}
-            onOpenSidebar={() => setIsSidebarOpen(true)}
+            columns={ALL_COLUMNS}
+            visibleColumns={visibleColumns}
+            setVisibleColumns={setVisibleColumns}
+            selectedJobs={selectedJobs}
+            setSelectedJobs={setSelectedJobs}
+            allJobIds={allJobIds}
+            refreshApplications={refreshApplications}
           />
         </div>
 
@@ -157,16 +223,10 @@ export default function Dashboard() {
             <table style={styles.table}>
               <thead>
                 <tr>
-                  {[
-                    { label: "Job Position", key: "role" },
-                    { label: "Company", key: "company" },
-                    { label: "Location", key: "location" },
-                    { label: "Date Posted", key: "date_posted" },
-                    { label: "Date Applied", key: "date_applied" },
-                    { label: "Salary", key: "salary" },
-                    { label: "Status", key: "status" },
-                    { label: "Notes", key: "notes" },
-                  ].map(h => (
+                  <th style={{ ...styles.th, width: '40px', textAlign: 'center' }}>
+                    {/* Header checkbox removed as requested; keeping empty cell for alignment */}
+                  </th>
+                  {ALL_COLUMNS.filter(c => visibleColumns.includes(c.key)).map(h => (
                     <th 
                       key={h.key} 
                       style={{...styles.th, cursor: "pointer"}}
@@ -194,34 +254,44 @@ export default function Dashboard() {
                       if (!app._empty) e.currentTarget.style.background = 'transparent'
                     }}
                   >
-                    <td style={styles.td}>{app._empty ? "" : app.role}</td>
-                    <td style={styles.td}>{app._empty ? "" : app.company}</td>
-                    <td style={styles.td}>{app._empty ? "" : (app.location || "")}</td>
-                    <td style={styles.td}>{app._empty ? "" : (app.date_posted || "")}</td>
-                    <td style={styles.td}>{app._empty ? "" : (app.date_applied || "")}</td>
-                    <td style={styles.td}>{app._empty ? "" : (app.salary || "")}</td>
-                    
-                    <td style={styles.td}>
+                    <td style={{ ...styles.td, textAlign: 'center' }}>
                       {!app._empty && (
-                        <div style={styles.statusDropdownContainer}>
-                          <select 
-                            value={app.status || "Applied"}
-                            onChange={(e) => handleStatusChange(app.id, e.target.value)}
-                            style={styles.statusSelect}
-                          >
-                            <option value="Applied">Applied</option>
-                            <option value="Interviewing">Interviewing</option>
-                            <option value="Offer">Offer</option>
-                            <option value="Accepted">Accepted</option>
-                            <option value="Rejected">Rejected</option>
-                            <option value="Ghosted">Ghosted</option>
-                          </select>
-                          <ChevronDown size={14} style={styles.statusChevron} />
-                        </div>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedJobs.includes(app.id)}
+                          onChange={() => handleSelectJob(app.id)}
+                        />
                       )}
                     </td>
+                    {visibleColumns.includes("role") && <td style={styles.td}>{!app._empty && <EditableCell value={app.role} onSave={val => handleInlineEdit(app.id, 'role', val)} />}</td>}
+                    {visibleColumns.includes("company") && <td style={styles.td}>{!app._empty && <EditableCell value={app.company} onSave={val => handleInlineEdit(app.id, 'company', val)} />}</td>}
+                    {visibleColumns.includes("location") && <td style={styles.td}>{!app._empty && <EditableCell value={app.location} onSave={val => handleInlineEdit(app.id, 'location', val)} />}</td>}
+                    {visibleColumns.includes("date_posted") && <td style={styles.td}>{!app._empty && <EditableCell value={app.date_posted} type="date" onSave={val => handleInlineEdit(app.id, 'date_posted', val)} />}</td>}
+                    {visibleColumns.includes("date_applied") && <td style={styles.td}>{!app._empty && <EditableCell value={app.date_applied} type="date" onSave={val => handleInlineEdit(app.id, 'date_applied', val)} />}</td>}
+                    {visibleColumns.includes("salary") && <td style={styles.td}>{!app._empty && <EditableCell value={app.salary} onSave={val => handleInlineEdit(app.id, 'salary', val)} />}</td>}
                     
-                    <td style={styles.td}>{app._empty ? "" : (app.notes || "")}</td>
+                    {visibleColumns.includes("status") && (
+                      <td style={styles.td}>
+                        {!app._empty && (
+                          <div style={styles.statusDropdownContainer}>
+                            <select 
+                              value={app.status || "Applied"}
+                              onChange={(e) => handleInlineEdit(app.id, 'status', e.target.value)}
+                              style={styles.statusSelect}
+                            >
+                              <option value="Applied">Applied</option>
+                              <option value="Interviewing">Interviewing</option>
+                              <option value="Offer">Offer</option>
+                              <option value="Accepted">Accepted</option>
+                              <option value="Rejected">Rejected</option>
+                              <option value="Ghosted">Ghosted</option>
+                            </select>
+                            <ChevronDown size={14} style={styles.statusChevron} />
+                          </div>
+                        )}
+                      </td>
+                    )}
+                    {visibleColumns.includes("notes") && <td style={styles.td}>{!app._empty && <EditableCell value={app.notes} onSave={val => handleInlineEdit(app.id, 'notes', val)} />}</td>}
                   </tr>
                 ))}
               </tbody>
@@ -284,11 +354,11 @@ const styles = {
     textAlign: "left",
     fontWeight: "normal",
     color: "#FFFFFF",
-    borderBottom: "1px solid #3A3F58",
     borderRight: "1px solid #3A3F58",
     position: "sticky",
     top: 0,
     background: "#181926", // Keep header background solid when scrolling
+    boxShadow: "inset 0 -1px 0 #3A3F58", // Keeps bottom border attached during scroll
     zIndex: 1,
   },
   tr: {
@@ -302,6 +372,22 @@ const styles = {
     color: "#FFFFFF",
     borderRight: "1px solid #3A3F58",
     verticalAlign: "middle",
+  },
+  editableText: {
+    cursor: "text",
+    minHeight: "20px",
+    display: "flex",
+    alignItems: "center",
+  },
+  inlineInput: {
+    width: "100%",
+    background: "rgba(255, 255, 255, 0.1)",
+    border: "1px solid #6C9BDB",
+    borderRadius: "2px",
+    color: "#FFFFFF",
+    padding: "4px 8px",
+    fontSize: "13px",
+    outline: "none",
   },
   statusDropdownContainer: {
     position: "relative",

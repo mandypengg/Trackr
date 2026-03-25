@@ -4,11 +4,13 @@ import { useNavigate } from "react-router-dom"
 export default function NavSidebar({ isOpen, onClose }) {
   const navigate = useNavigate()
 
-  if (!isOpen) return null
-
   return (
-    <div style={styles.sidebar}>
-      {/* Header */}
+    <div style={{
+      ...styles.sidebar,
+      width: isOpen ? "240px" : "0px",
+    }}>
+      <div style={styles.innerContainer}>
+        {/* Header */}
       <div style={styles.header}>
         <span style={styles.logo}>Trackr</span>
         <button 
@@ -52,22 +54,32 @@ export default function NavSidebar({ isOpen, onClose }) {
           <span style={styles.accountText}>Account</span>
         </div>
       </div>
+      </div>
     </div>
   )
 }
 
 const styles = {
   sidebar: {
-    width: "240px",
-    background: "#1E1F2E",
+    height: "100vh",
+    background: "#181926",
     borderRight: "1px solid #3A3F58",
+    color: "#FFFFFF",
     display: "flex",
     flexDirection: "column",
-    height: "100vh",
     position: "fixed",
     left: 0,
     top: 0,
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    zIndex: 100,
+    overflow: "hidden",
+    transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+  },
+  innerContainer: {
+    width: "240px", // Maintains layout while outer container shrinks
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
   },
   header: {
     display: "flex",
