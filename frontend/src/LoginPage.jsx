@@ -1,15 +1,49 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "./AuthContext"
+import { apiFetch } from "./api"
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [form, setForm] = useState({ email: "", password: "" })
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value })
 
+  const handleSubmit = async e => {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+    try {
+      const data = await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: form.email, password: form.password }),
+      })
+      login(data.access_token)
+      navigate("/dashboard")
+    } catch (err) {
+      setError(err.message || "Invalid email or password")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div style={styles.page}>
-      <div style={styles.card}>
+      <div 
+        style={{
+          ...styles.card,
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? "translateY(0)" : "translateY(20px)",
+        }}
+      >
 
         {/* Header */}
         <div style={styles.header}>
@@ -18,7 +52,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <div style={styles.form}>
+        <form style={styles.form} onSubmit={handleSubmit}>
           <div style={styles.field}>
             <label style={styles.label}>Email:</label>
             <input
@@ -29,6 +63,7 @@ export default function LoginPage() {
               style={styles.input}
               onFocus={e => e.target.style.outline = "1.5px solid #6c63e0"}
               onBlur={e => e.target.style.outline = "none"}
+              required
             />
           </div>
 
@@ -42,17 +77,22 @@ export default function LoginPage() {
               style={styles.input}
               onFocus={e => e.target.style.outline = "1.5px solid #6c63e0"}
               onBlur={e => e.target.style.outline = "none"}
+              required
             />
           </div>
 
+          {error && <p style={styles.errorText}>{error}</p>}
+
           <button
-            style={styles.submitBtn}
-            onMouseEnter={e => e.target.style.background = "#3a5a96"}
-            onMouseLeave={e => e.target.style.background = "#4a6fa5"}
+            type="submit"
+            style={{ ...styles.submitBtn, opacity: loading ? 0.7 : 1 }}
+            disabled={loading}
+            onMouseEnter={e => { if (!loading) e.target.style.background = "#3a5a96" }}
+            onMouseLeave={e => { if (!loading) e.target.style.background = "#4a6fa5" }}
           >
-            Sign in
+            {loading ? "Signing in…" : "Sign in"}
           </button>
-        </div>
+        </form>
 
         {/* Footer */}
         <p style={styles.switchText}>
@@ -85,6 +125,8 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "1.5rem",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+    transition: "opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
   },
   header: {
     display: "flex",
@@ -132,7 +174,14 @@ const styles = {
     fontSize: "14px",
     color: "#1a1a2e",
     outline: "none",
-    transition: "outline 0.15s ease",
+    transition: "all 0.2s ease",
+    boxShadow: "0 0 0 0px rgba(108, 99, 224, 0)",
+  },
+  errorText: {
+    color: "#e07a7a",
+    fontSize: "13px",
+    margin: 0,
+    textAlign: "center",
   },
   submitBtn: {
     background: "#4a6fa5",
@@ -144,7 +193,8 @@ const styles = {
     fontFamily: "'Georgia', serif",
     cursor: "pointer",
     marginTop: "0.5rem",
-    transition: "background 0.2s ease",
+    transition: "all 0.2s ease",
+    boxShadow: "0 4px 12px rgba(74, 111, 165, 0.2)",
   },
   switchText: {
     textAlign: "center",

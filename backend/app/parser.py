@@ -18,7 +18,7 @@ COLUMN_MAPPING = {
 
 def normalize_columns(df):
     df.columns = [col.strip().lower() for col in df.columns]
-    df.rename(columns=COLUMN_MAPPING)
+    df = df.rename(columns=COLUMN_MAPPING)
     return df
 
 def parse_csv(file_bytes):
