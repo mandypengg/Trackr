@@ -20,6 +20,8 @@ export default function Dashboard() {
   
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [isAddJobOpen, setIsAddJobOpen] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [sortConfig, setSortConfig] = useState(null)
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -73,28 +75,80 @@ export default function Dashboard() {
     setFilteredApps(filtered)
   }, [searchQuery, applications])
 
+  const handleStatusChange = async (appId, newStatus) => {
+    try {
+      // Optimistic upate
+      const updateLocal = prev => prev.map(a => a.id === appId ? { ...a, status: newStatus } : a)
+      setApplications(updateLocal)
+      setFilteredApps(updateLocal)
+      
+      await apiFetch(`/applications/${appId}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: newStatus })
+      })
+    } catch (err) {
+      console.error("Failed to update status", err)
+      refreshApplications() // Revert on err
+    }
+  }
+
+  const handleSort = (key) => {
+    let direction = 'asc'
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc'
+    } else if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
+      setSortConfig(null)
+      return
+    }
+    setSortConfig({ key, direction })
+  }
+
+  const sortedApps = [...filteredApps].sort((a, b) => {
+    if (!sortConfig) return 0
+    let aVal = a[sortConfig.key] || ""
+    let bVal = b[sortConfig.key] || ""
+    
+    // Simple parsing for numeric salary if needed, but string compare is ok for now out of box
+    // since "100k" vs "80k" sorts alphanumerically correctly in most naive cases.
+    if (typeof aVal === 'string') aVal = aVal.toLowerCase()
+    if (typeof bVal === 'string') bVal = bVal.toLowerCase()
+
+    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
+    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
+    return 0
+  })
+
   if (!token) return null
 
   // Ensure minimum 8 rows for the grid look, fill with empties
-  const displayApps = [...filteredApps]
+  const displayApps = [...sortedApps]
   while (displayApps.length < 8) {
     displayApps.push({ _empty: true, id: `empty-${displayApps.length}` })
   }
 
+  const SortIcon = ({ col }) => {
+    if (!sortConfig || sortConfig.key !== col) return null
+    return <span style={{ marginLeft: '4px', fontSize: '12px' }}>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+  }
+
   return (
     <div style={styles.page}>
-      <NavSidebar />
+      <NavSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       
       {/* Main Content Area (offset by sidebar width) */}
-      <div style={styles.mainContent}>
-        <MetricsBar applications={applications} />
-        <ActionBar 
-          onSearch={setSearchQuery} 
-          onUploadClick={() => setIsUploadOpen(true)}
-          onAddJobClick={() => setIsAddJobOpen(true)}
-        />
+      <div style={{ ...styles.mainContent, marginLeft: isSidebarOpen ? "240px" : "0" }}>
+        <div style={styles.topSection}>
+          <MetricsBar applications={applications} />
+          <ActionBar 
+            onSearch={setSearchQuery} 
+            onUploadClick={() => setIsUploadOpen(true)}
+            onAddJobClick={() => setIsAddJobOpen(true)}
+            isSidebarOpen={isSidebarOpen}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+          />
+        </div>
 
-        {/* Table Area */}
+        {/* Table Area (Scrollable) */}
         <div style={styles.tableContainer}>
           {loading && <p style={styles.stateMsg}>Loading…</p>}
           {error && <p style={{ ...styles.stateMsg, color: "#e07a7a" }}>{error}</p>}
@@ -103,19 +157,43 @@ export default function Dashboard() {
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Job Position</th>
-                  <th style={styles.th}>Company</th>
-                  <th style={styles.th}>Location</th>
-                  <th style={styles.th}>Date Posted</th>
-                  <th style={styles.th}>Date Applied</th>
-                  <th style={styles.th}>Salary</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Notes</th>
+                  {[
+                    { label: "Job Position", key: "role" },
+                    { label: "Company", key: "company" },
+                    { label: "Location", key: "location" },
+                    { label: "Date Posted", key: "date_posted" },
+                    { label: "Date Applied", key: "date_applied" },
+                    { label: "Salary", key: "salary" },
+                    { label: "Status", key: "status" },
+                    { label: "Notes", key: "notes" },
+                  ].map(h => (
+                    <th 
+                      key={h.key} 
+                      style={{...styles.th, cursor: "pointer"}}
+                      onClick={() => handleSort(h.key)}
+                      onMouseEnter={e => e.currentTarget.style.background = '#2B2F42'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#181926'}
+                    >
+                      {h.label} <SortIcon col={h.key} />
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {displayApps.map((app) => (
-                  <tr key={app.id} style={styles.tr}>
+                {displayApps.map((app, index) => (
+                  <tr 
+                    key={app.id} 
+                    style={{
+                      ...styles.tr,
+                      animationDelay: `${index * 0.03}s` // Staggered fade in
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!app._empty) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!app._empty) e.currentTarget.style.background = 'transparent'
+                    }}
+                  >
                     <td style={styles.td}>{app._empty ? "" : app.role}</td>
                     <td style={styles.td}>{app._empty ? "" : app.company}</td>
                     <td style={styles.td}>{app._empty ? "" : (app.location || "")}</td>
@@ -125,9 +203,20 @@ export default function Dashboard() {
                     
                     <td style={styles.td}>
                       {!app._empty && (
-                        <div style={styles.statusDropdown}>
-                          <span>{app.status || "Value"}</span>
-                          <ChevronDown size={14} />
+                        <div style={styles.statusDropdownContainer}>
+                          <select 
+                            value={app.status || "Applied"}
+                            onChange={(e) => handleStatusChange(app.id, e.target.value)}
+                            style={styles.statusSelect}
+                          >
+                            <option value="Applied">Applied</option>
+                            <option value="Interviewing">Interviewing</option>
+                            <option value="Offer">Offer</option>
+                            <option value="Accepted">Accepted</option>
+                            <option value="Rejected">Rejected</option>
+                            <option value="Ghosted">Ghosted</option>
+                          </select>
+                          <ChevronDown size={14} style={styles.statusChevron} />
                         </div>
                       )}
                     </td>
@@ -159,7 +248,8 @@ export default function Dashboard() {
 const styles = {
   page: {
     background: "#181926",
-    minHeight: "100vh",
+    height: "100vh",
+    overflow: "hidden", // Prevent full page scroll
     color: "#FFFFFF",
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
   },
@@ -167,11 +257,18 @@ const styles = {
     marginLeft: "240px", // width of sidebar
     display: "flex",
     flexDirection: "column",
-    minHeight: "100vh",
+    height: "100vh",
+  },
+  topSection: {
+    flexShrink: 0,
+    zIndex: 10,
+    backgroundColor: "#181926",
   },
   tableContainer: {
     padding: "0",
     flex: 1,
+    overflowY: "auto", // Allow only the table area to scroll
+    animation: "fadeIn 0.4s ease",
   },
   stateMsg: {
     padding: "24px",
@@ -189,10 +286,16 @@ const styles = {
     color: "#FFFFFF",
     borderBottom: "1px solid #3A3F58",
     borderRight: "1px solid #3A3F58",
+    position: "sticky",
+    top: 0,
+    background: "#181926", // Keep header background solid when scrolling
+    zIndex: 1,
   },
   tr: {
     borderBottom: "1px solid #3A3F58",
     height: "64px", // Fixed height for matching vertical grid
+    animation: "slideUp 0.3s ease backwards", // backwards applies the 0 opacity before delay starts
+    transition: "background 0.2s ease",
   },
   td: {
     padding: "12px 16px",
@@ -200,17 +303,26 @@ const styles = {
     borderRight: "1px solid #3A3F58",
     verticalAlign: "middle",
   },
-  statusDropdown: {
+  statusDropdownContainer: {
+    position: "relative",
     display: "inline-flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    width: "100px",
-    padding: "6px 10px",
+  },
+  statusSelect: {
+    appearance: "none",
+    width: "110px",
+    padding: "6px 24px 6px 10px",
     border: "1px solid #FFFFFF",
     borderRadius: "4px",
     background: "transparent",
     color: "#FFFFFF",
     fontSize: "13px",
     cursor: "pointer",
+    outline: "none",
+  },
+  statusChevron: {
+    position: "absolute",
+    right: "8px",
+    pointerEvents: "none",
   }
 }

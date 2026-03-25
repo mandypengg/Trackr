@@ -1,15 +1,22 @@
 import { ArrowLeft, LayoutDashboard, BarChart3, Settings } from 'lucide-react'
 import { useNavigate } from "react-router-dom"
 
-export default function NavSidebar() {
+export default function NavSidebar({ isOpen, onClose }) {
   const navigate = useNavigate()
+
+  if (!isOpen) return null
 
   return (
     <div style={styles.sidebar}>
       {/* Header */}
       <div style={styles.header}>
         <span style={styles.logo}>Trackr</span>
-        <button style={styles.backBtn} onClick={() => navigate("/")}>
+        <button 
+          style={styles.backBtn} 
+          onClick={onClose}
+          onMouseEnter={e => e.currentTarget.style.color = '#6C9BDB'}
+          onMouseLeave={e => e.currentTarget.style.color = '#FFFFFF'}
+        >
           <ArrowLeft size={18} />
         </button>
       </div>
@@ -19,14 +26,28 @@ export default function NavSidebar() {
         <button style={{...styles.navItem, ...styles.navItemActive}}>
           Job Tracker
         </button>
-        <button style={styles.navItem}>
+        <button 
+          style={styles.navItem}
+          onMouseEnter={e => {
+            e.currentTarget.style.color = '#FFFFFF'
+            e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.color = '#A0A4B8'
+            e.currentTarget.style.background = 'transparent'
+          }}
+        >
           Analytics
         </button>
       </div>
 
       {/* Footer / Account */}
       <div style={styles.footer}>
-        <div style={styles.accountItem}>
+        <div 
+          style={styles.accountItem}
+          onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+        >
           <div style={styles.avatar}></div>
           <span style={styles.accountText}>Account</span>
         </div>
@@ -69,6 +90,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    transition: "color 0.2s ease",
   },
   navLinks: {
     padding: "24px 0",
@@ -104,6 +126,7 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     cursor: "pointer",
+    transition: "opacity 0.2s ease",
   },
   avatar: {
     width: "24px",
