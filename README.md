@@ -130,9 +130,3 @@ App will be available at `http://localhost:5173`
 - [ ] Deployment (Vercel + Railway)
 
 ---
-
-## Author
-
-**Mandy Peng**
-- GitHub: [@mandypengg](https://github.com/mandypengg)
-- LinkedIn: [mandypengg](https://www.linkedin.com/in/mandypengg)
